@@ -104,6 +104,23 @@ router.get('/track/:trackingId', async (req, res) => {
   }
 });
 
+// ── GET /api/courier/track-auth/:trackingId — authenticated (includes OTP for owner) ──
+router.get('/track-auth/:trackingId', protect, async (req, res) => {
+  try {
+    const courier = await Courier.findOne({
+      trackingId: req.params.trackingId.toUpperCase(),
+    });
+    if (!courier) return res.status(404).json({ message: 'Tracking ID not found.' });
+    // Only expose OTP to the owner or admin
+    const isOwner = String(courier.createdBy) === String(req.user.id);
+    const isAdmin = req.user.role === 'admin';
+    if (!isOwner && !isAdmin) return res.status(403).json({ message: 'Access denied' });
+    res.json(courier);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // ── PUT /api/courier/update/:id — admin (status + agent) ─────────────────────
 router.put('/update/:id', protect, adminOnly, async (req, res) => {
   try {

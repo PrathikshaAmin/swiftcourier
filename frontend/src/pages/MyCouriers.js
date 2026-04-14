@@ -68,8 +68,21 @@ export default function MyCouriers() {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
                   <div>
-                    <p style={{ fontWeight: '800', fontSize: '18px', color: '#4f46e5', letterSpacing: '0.5px' }}>{c.trackingId}</p>
+                    <p
+                      onClick={() => navigate(`/track/${c.trackingId}`)}
+                      style={{ fontWeight: '800', fontSize: '18px', color: '#4f46e5', letterSpacing: '0.5px', cursor: 'pointer', textDecoration: 'underline', display: 'inline-block' }}
+                    >{c.trackingId}</p>
                     <p style={{ color: muted, fontSize: '12px', marginTop: '2px' }}>{new Date(c.createdAt).toLocaleString()}</p>
+                    {/* Expected delivery */}
+                    <p style={{ color: muted, fontSize: '12px', marginTop: '3px' }}>
+                      📅 Expected:{' '}
+                      <span style={{ color: c.status === 'Delivered' ? '#16a34a' : '#f59e0b', fontWeight: '600' }}>
+                        {c.status === 'Delivered'
+                          ? 'Delivered ✅'
+                          : new Date(new Date(c.createdAt).getTime() + 10 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                        }
+                      </span>
+                    </p>
                     {/* Payment status */}
                     <span style={{
                       display: 'inline-block', marginTop: '6px',

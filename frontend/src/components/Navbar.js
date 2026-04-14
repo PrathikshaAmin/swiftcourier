@@ -49,13 +49,16 @@ export default function Navbar() {
 
       {/* Links */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        {navLink('/track', '🔍 Track Parcel')}
         {user?.role === 'customer' && <>
           {navLink('/dashboard', 'Dashboard')}
           {navLink('/book', 'Book Courier')}
+          {navLink('/track', '🔍 Track Parcel')}
           {navLink('/my-couriers', 'My Orders')}
         </>}
-        {user?.role === 'admin' && navLink('/admin', '⚙️ Admin Panel')}
+        {user?.role === 'admin' && <>
+          {navLink('/admin', '⚙️ Admin Panel')}
+          {navLink('/admin/orders', '📦 Orders')}
+        </>}
 
         {/* Dark toggle */}
         <button onClick={() => setDarkMode(!dark)} style={{

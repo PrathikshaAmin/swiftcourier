@@ -22,10 +22,18 @@ export default function AdminDashboard() {
   useEffect(() => {
     Promise.all([
       api.get('/couriers/all'),
-      api.get('/couriers/stats/summary'),
+      api.get('/courier/stats'),
     ]).then(([c, s]) => {
       setCouriers(c.data);
-      setStats(s.data);
+      // Map stats fields from /courier/stats to what the dashboard expects
+      const raw = s.data;
+      setStats({
+        total:         raw.total,
+        delivered:     raw.delivered,
+        pending:       raw.orderPlaced,
+        outForDelivery:raw.outForDelivery,
+        shipped:       raw.inTransit,
+      });
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -38,7 +46,7 @@ export default function AdminDashboard() {
   const saveEdit = async () => {
     setSaving(true);
     try {
-      const { data } = await api.put(`/couriers/${editModal._id}`, editForm);
+      const { data } = await api.put(`/courier/update/${editModal._id}`, editForm);
       setCouriers(prev => prev.map(c => c._id === data._id ? data : c));
       setStats(prev => {
         const updated = { ...prev };
@@ -48,8 +56,14 @@ export default function AdminDashboard() {
       toast.success('Courier updated!');
       setEditModal(null);
       // Refresh stats
-      const { data: s } = await api.get('/couriers/stats/summary');
-      setStats(s);
+      const { data: raw } = await api.get('/courier/stats');
+      setStats({
+        total:         raw.total,
+        delivered:     raw.delivered,
+        pending:       raw.orderPlaced,
+        outForDelivery:raw.outForDelivery,
+        shipped:       raw.inTransit,
+      });
     } catch (err) {
       toast.error('Update failed');
     } finally {

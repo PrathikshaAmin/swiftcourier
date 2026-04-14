@@ -95,9 +95,22 @@ export default function CustomerDashboard() {
                 <div key={c._id} style={{ padding: '16px', borderRadius: '12px', background: darkMode ? '#0f172a' : '#f8fafc', border: `1px solid ${border}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
                     <div style={{ flex: 1 }}>
-                      <p style={{ fontWeight: '700', color: '#4f46e5', fontSize: '15px', letterSpacing: '0.5px' }}>{c.trackingId}</p>
+                      <p
+                        onClick={() => navigate(`/track/${c.trackingId}`)}
+                        style={{ fontWeight: '700', color: '#4f46e5', fontSize: '15px', letterSpacing: '0.5px', cursor: 'pointer', textDecoration: 'underline', display: 'inline-block' }}
+                      >{c.trackingId}</p>
                       <p style={{ color: muted, fontSize: '12px', marginTop: '3px' }}>
                         To: {c.receiverName} · {c.packageType} · {new Date(c.createdAt).toLocaleDateString()}
+                      </p>
+                      {/* Expected delivery */}
+                      <p style={{ color: muted, fontSize: '12px', marginTop: '2px' }}>
+                        📅 Expected delivery:{' '}
+                        <span style={{ color: c.status === 'Delivered' ? '#16a34a' : '#f59e0b', fontWeight: '600' }}>
+                          {c.status === 'Delivered'
+                            ? 'Delivered ✅'
+                            : new Date(new Date(c.createdAt).getTime() + 10 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                          }
+                        </span>
                       </p>
                       {/* Payment badge */}
                       <span style={{
@@ -120,7 +133,7 @@ export default function CustomerDashboard() {
                           cursor: 'pointer', whiteSpace: 'nowrap',
                         }}
                       >
-                        🔍 Track Parcel
+                        🔍 Track
                       </button>
                     </div>
                   </div>

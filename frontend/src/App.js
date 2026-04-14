@@ -7,6 +7,8 @@ import BookCourier from './pages/BookCourier';
 import CustomerDashboard from './pages/CustomerDashboard';
 import Login from './pages/Login';
 import MyCouriers from './pages/MyCouriers';
+import OrdersDashboard from './pages/OrdersDashboard';
+import PlaceOrder from './pages/PlaceOrder';
 import Register from './pages/Register';
 import TrackCourier from './pages/TrackCourier';
 
@@ -36,7 +38,9 @@ function AppRoutes() {
         <Route path="/dashboard" element={<Guard role="customer"><CustomerDashboard /></Guard>} />
         <Route path="/book" element={<Guard role="customer"><BookCourier /></Guard>} />
         <Route path="/my-couriers" element={<Guard role="customer"><MyCouriers /></Guard>} />
+        <Route path="/place-order" element={<Guard role="customer"><PlaceOrder /></Guard>} />
         <Route path="/admin" element={<Guard role="admin"><AdminDashboard /></Guard>} />
+        <Route path="/admin/orders" element={<Guard role="admin"><OrdersDashboard /></Guard>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toaster
