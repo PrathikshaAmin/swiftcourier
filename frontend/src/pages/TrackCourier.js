@@ -95,7 +95,7 @@ export default function TrackCourier() {
     : null;
 
   return (
-    <div style={{ minHeight: '100vh', background: bg, padding: '40px 24px' }}>
+    <div className="sc-page">
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
 
         {/* Hero */}
@@ -370,10 +370,6 @@ export default function TrackCourier() {
           </div>
         )}
       </div>
-      <style>{`
-        @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes pulse  { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
-      `}</style>
     </div>
   );
 }

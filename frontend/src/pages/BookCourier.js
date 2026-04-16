@@ -119,12 +119,11 @@ export default function BookCourier() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: bg, padding: '40px 24px' }}>
+    <div className="sc-page">
       <div style={{ maxWidth: '640px', margin: '0 auto' }}>
-
         <div style={{ marginBottom: '32px', animation: 'fadeUp 0.4s ease' }}>
-          <h1 style={{ fontSize: '28px', fontWeight: '800', color: text }}>Book a Courier</h1>
-          <p style={{ color: muted, marginTop: '6px' }}>Fill in the shipment details below</p>
+          <h1 style={{ fontSize: '26px', fontWeight: '800', color: text }}>Book a Courier</h1>
+          <p style={{ color: muted, marginTop: '6px', fontSize: 14 }}>Fill in the shipment details below</p>
         </div>
 
         {/* Booking confirmation */}
@@ -169,7 +168,7 @@ export default function BookCourier() {
           </div>
         )}
 
-        <div style={{ background: card, borderRadius: '20px', padding: '32px', border: `1px solid ${border}`, animation: 'fadeUp 0.5s ease' }}>
+        <div className="sc-card" style={{ padding: '32px', animation: 'fadeUp 0.5s ease' }}>
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
@@ -233,7 +232,6 @@ export default function BookCourier() {
           </form>
         </div>
       </div>
-      <style>{`@keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }`}</style>
     </div>
   );
 }

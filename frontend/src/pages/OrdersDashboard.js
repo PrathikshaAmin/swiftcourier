@@ -1,199 +1,220 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
+import StatusBadge from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 
-const STATUSES = ['Pending', 'Shipped', 'Out for Delivery', 'Delivered'];
+const ALL_STATUSES = ['Order Placed', 'Packaging', 'In Transit', 'Reached Depot', 'Out for Delivery', 'Delivered'];
 
-const STATUS_COLORS = {
-  Pending:           { bg: '#fffbeb', color: '#d97706', dark_bg: '#1c1400' },
-  Shipped:           { bg: '#eff6ff', color: '#2563eb', dark_bg: '#0c1a3a' },
-  'Out for Delivery':{ bg: '#f5f3ff', color: '#7c3aed', dark_bg: '#1a0f3a' },
-  Delivered:         { bg: '#f0fdf4', color: '#16a34a', dark_bg: '#052e16' },
-};
+const STAGE_TABS = [
+  { key: 'All',              label: 'All',              icon: '📦' },
+  { key: 'Order Placed',     label: 'Order Placed',     icon: '🆕' },
+  { key: 'Packaging',        label: 'Packaging',        icon: '🗃️'  },
+  { key: 'In Transit',       label: 'In Transit',       icon: '🚚' },
+  { key: 'Reached Depot',    label: 'Reached Depot',    icon: '🏭' },
+  { key: 'Out for Delivery', label: 'Out for Delivery', icon: '🛵' },
+  { key: 'Delivered',        label: 'Delivered',        icon: '✅' },
+];
 
 export default function OrdersDashboard() {
   const { darkMode } = useAuth();
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [couriers, setCouriers]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [search, setSearch]       = useState('');
+  const [activeTab, setActiveTab] = useState('All');
+
+  // Edit modal
   const [editModal, setEditModal] = useState(null);
-  const [newStatus, setNewStatus] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [editForm, setEditForm]   = useState({ status: '', assignedAgent: '' });
+  const [saving, setSaving]       = useState(false);
+
+  // OTP modal
+  const [otpModal, setOtpModal]   = useState(null);
+  const [otpInput, setOtpInput]   = useState('');
+  const [verifying, setVerifying] = useState(false);
+
   const prevCountRef = useRef(0);
 
-  const bg     = darkMode ? '#0f172a' : '#f8fafc';
-  const card   = darkMode ? '#1e293b' : '#ffffff';
-  const border = darkMode ? '#334155' : '#e2e8f0';
-  const text   = darkMode ? '#e2e8f0' : '#1e293b';
-  const muted  = darkMode ? '#94a3b8' : '#64748b';
-  const inputBg = darkMode ? '#0f172a' : '#f8fafc';
+  const dark   = darkMode;
+  const border = dark ? '#334155' : '#e2e8f0';
+  const text   = dark ? '#e2e8f0' : '#1e293b';
+  const muted  = dark ? '#94a3b8' : '#64748b';
 
-  const fetchOrders = useCallback(async (silent = false) => {
+  const fetchCouriers = useCallback(async (silent = false) => {
     try {
-      const params = search ? `?search=${encodeURIComponent(search)}` : '';
-      const { data } = await api.get(`/orders${params}`);
-      setOrders(data);
-      if (!silent && prevCountRef.current > 0 && data.length > prevCountRef.current) {
+      const { data } = await api.get('/couriers/all');
+      setCouriers(data);
+      if (!silent && prevCountRef.current > 0 && data.length > prevCountRef.current)
         toast.success(`🆕 ${data.length - prevCountRef.current} new order(s) arrived!`);
-      }
       prevCountRef.current = data.length;
     } catch {
       if (!silent) toast.error('Failed to load orders');
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, []);
 
-  // Initial load
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
-
-  // Poll every 10 seconds for new orders
+  useEffect(() => { fetchCouriers(); }, [fetchCouriers]);
   useEffect(() => {
-    const interval = setInterval(() => fetchOrders(true), 10000);
-    return () => clearInterval(interval);
-  }, [fetchOrders]);
+    const t = setInterval(() => fetchCouriers(true), 10000);
+    return () => clearInterval(t);
+  }, [fetchCouriers]);
 
-  const openEdit = (order) => {
-    setEditModal(order);
-    setNewStatus(order.status);
-  };
-
-  const saveStatus = async () => {
+  const saveEdit = async () => {
     setSaving(true);
     try {
-      const { data } = await api.patch(`/orders/${editModal._id}`, { status: newStatus });
-      setOrders(prev => prev.map(o => o._id === data._id ? data : o));
-      toast.success('Status updated!');
+      const { data } = await api.put(`/courier/update/${editModal._id}`, editForm);
+      setCouriers(prev => prev.map(c => c._id === data._id ? data : c));
+      toast.success('Order updated!');
       setEditModal(null);
-    } catch {
-      toast.error('Update failed');
-    } finally {
-      setSaving(false);
-    }
+    } catch { toast.error('Update failed'); }
+    finally { setSaving(false); }
   };
 
-  const statusBadge = (status) => {
-    const s = STATUS_COLORS[status] || STATUS_COLORS.Pending;
-    return (
-      <span style={{
-        padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700',
-        background: darkMode ? s.dark_bg : s.bg, color: s.color,
-      }}>{status}</span>
+  const verifyOtp = async () => {
+    if (!otpInput.trim()) return toast.error('Enter the OTP from the customer');
+    setVerifying(true);
+    try {
+      const { data } = await api.post('/courier/verify-otp', { courierId: otpModal._id, otp: otpInput });
+      setCouriers(prev => prev.map(c => c._id === data.courier._id ? data.courier : c));
+      toast.success('✅ Delivery confirmed!');
+      setOtpModal(null); setOtpInput('');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'OTP verification failed');
+    } finally { setVerifying(false); }
+  };
+
+  // Filter by tab + search
+  const filtered = couriers
+    .filter(c => activeTab === 'All' || c.status === activeTab)
+    .filter(c =>
+      c.trackingId?.toLowerCase().includes(search.toLowerCase()) ||
+      c.senderName?.toLowerCase().includes(search.toLowerCase()) ||
+      c.receiverName?.toLowerCase().includes(search.toLowerCase())
     );
-  };
 
-  const stats = {
-    total:    orders.length,
-    pending:  orders.filter(o => o.status === 'Pending').length,
-    shipped:  orders.filter(o => o.status === 'Shipped').length,
-    delivered:orders.filter(o => o.status === 'Delivered').length,
-  };
+  // Count per tab
+  const countFor = key => key === 'All' ? couriers.length : couriers.filter(c => c.status === key).length;
 
   return (
-    <div style={{ minHeight: '100vh', background: bg, padding: '32px 24px' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-
-        {/* Header */}
-        <div style={{ marginBottom: '32px', animation: 'fadeUp 0.4s ease' }}>
-          <h1 style={{ fontSize: '28px', fontWeight: '800', color: text }}>Orders Dashboard</h1>
-          <p style={{ color: muted, marginTop: '4px' }}>All customer orders — auto-refreshes every 10s</p>
+    <>
+      <div className="sc-page" style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <div style={{ marginBottom: 24, animation: 'fadeUp 0.35s ease' }}>
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: text }}>All Orders</h1>
+          <p style={{ color: muted, marginTop: 4, fontSize: 14 }}>Filter by delivery stage · auto-refreshes every 10s</p>
         </div>
 
-        {/* Stat cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
-          {[
-            { label: 'Total Orders', value: stats.total,     icon: '📦', color: '#6366f1' },
-            { label: 'Pending',      value: stats.pending,   icon: '⏳', color: '#d97706' },
-            { label: 'Shipped',      value: stats.shipped,   icon: '🚚', color: '#2563eb' },
-            { label: 'Delivered',    value: stats.delivered, icon: '✅', color: '#16a34a' },
-          ].map(({ label, value, icon, color }, i) => (
-            <div key={label} style={{
-              background: card, borderRadius: '16px', padding: '20px',
-              border: `1px solid ${border}`, animation: `fadeUp ${0.4 + i * 0.1}s ease`,
-            }}>
-              <div style={{ fontSize: '28px', marginBottom: '8px' }}>{icon}</div>
-              <div style={{ fontSize: '32px', fontWeight: '800', color }}>{value}</div>
-              <div style={{ fontSize: '13px', color: muted, marginTop: '2px' }}>{label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Table */}
+        {/* Stage filter tabs */}
         <div style={{
-          background: card, borderRadius: '20px', padding: '24px',
-          border: `1px solid ${border}`, animation: 'fadeUp 0.6s ease',
+          display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap',
+          animation: 'fadeUp 0.4s ease',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '700', color: text }}>All Orders</h3>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search by name, phone, order ID..."
-                style={{
-                  padding: '10px 16px', borderRadius: '10px',
-                  border: `1px solid ${border}`, background: inputBg, color: text,
-                  fontSize: '13px', outline: 'none', width: '280px',
-                }}
-              />
+          {STAGE_TABS.map(({ key, label, icon }) => {
+            const active = activeTab === key;
+            const count  = countFor(key);
+            return (
               <button
-                onClick={() => fetchOrders()}
+                key={key}
+                onClick={() => setActiveTab(key)}
                 style={{
-                  padding: '10px 16px', borderRadius: '10px',
-                  background: 'linear-gradient(135deg,#4f46e5,#7c3aed)',
-                  color: '#fff', border: 'none', cursor: 'pointer',
-                  fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '8px 14px', borderRadius: 10, fontSize: 13,
+                  fontWeight: active ? 700 : 500, cursor: 'pointer',
+                  border: `1.5px solid ${active ? '#4f46e5' : border}`,
+                  background: active ? (dark ? '#1e1b4b' : '#eef2ff') : (dark ? '#1e293b' : '#ffffff'),
+                  color: active ? '#4f46e5' : muted,
+                  transition: 'all 0.15s',
+                  boxShadow: active ? '0 2px 8px rgba(79,70,229,0.15)' : 'none',
                 }}
-              >↻ Refresh</button>
+              >
+                <span>{icon}</span>
+                {label}
+                <span style={{
+                  background: active ? '#4f46e5' : (dark ? '#334155' : '#f1f5f9'),
+                  color: active ? '#fff' : muted,
+                  borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700,
+                }}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Table card */}
+        <div className="sc-card" style={{ padding: 24, animation: 'fadeUp 0.45s ease' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: text }}>
+              {activeTab === 'All' ? 'All Couriers' : activeTab}
+              <span style={{ marginLeft: 8, fontSize: 13, color: muted, fontWeight: 500 }}>({filtered.length})</span>
+            </h3>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <input
+                value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Search tracking ID, sender, receiver..."
+                className="sc-input" style={{ width: 280 }}
+              />
+              <button onClick={() => fetchCouriers()} className="sc-btn"
+                style={{ background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', color: '#fff', padding: '10px 16px', fontSize: 13 }}>
+                ↻
+              </button>
             </div>
           </div>
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: muted }}>Loading orders...</div>
-          ) : orders.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: muted }}>
-              <div style={{ fontSize: '48px', marginBottom: '12px' }}>📭</div>
-              <p>No orders found</p>
+            <div style={{ textAlign: 'center', padding: 60, color: muted }}>Loading...</div>
+          ) : filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 60, color: muted }}>
+              <div style={{ fontSize: 44, marginBottom: 12 }}>📭</div>
+              <p>{search ? 'No results match your search' : `No orders in "${activeTab}"`}</p>
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table className="sc-table">
                 <thead>
-                  <tr style={{ borderBottom: `1px solid ${border}` }}>
-                    {['Order ID', 'Customer', 'Phone', 'Pickup', 'Delivery', 'Type', 'Weight', 'Status', 'Date', 'Action'].map(h => (
-                      <th key={h} style={{
-                        padding: '12px 10px', textAlign: 'left',
-                        fontSize: '11px', fontWeight: '700', color: muted,
-                        textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap',
-                      }}>{h}</th>
+                  <tr>
+                    {['Tracking ID', 'Sender', 'Receiver', 'Package', 'Pickup', 'Delivery', 'Agent', 'Payment', 'Status', 'Date', 'Actions'].map(h => (
+                      <th key={h}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((o, i) => (
-                    <tr key={o._id} style={{
-                      borderBottom: `1px solid ${border}`,
-                      animation: `fadeUp ${0.2 + i * 0.02}s ease`,
-                    }}>
-                      <td style={{ padding: '14px 10px', fontSize: '13px', fontWeight: '700', color: '#6366f1', whiteSpace: 'nowrap' }}>{o.orderId}</td>
-                      <td style={{ padding: '14px 10px', fontSize: '13px', color: text, whiteSpace: 'nowrap' }}>{o.customerName}</td>
-                      <td style={{ padding: '14px 10px', fontSize: '13px', color: muted, whiteSpace: 'nowrap' }}>{o.phone}</td>
-                      <td style={{ padding: '14px 10px', fontSize: '12px', color: muted, maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={o.pickupAddress}>{o.pickupAddress}</td>
-                      <td style={{ padding: '14px 10px', fontSize: '12px', color: muted, maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={o.deliveryAddress}>{o.deliveryAddress}</td>
-                      <td style={{ padding: '14px 10px', fontSize: '13px', color: muted }}>{o.parcelType}</td>
-                      <td style={{ padding: '14px 10px', fontSize: '13px', color: muted, whiteSpace: 'nowrap' }}>{o.weight} kg</td>
-                      <td style={{ padding: '14px 10px' }}>{statusBadge(o.status)}</td>
-                      <td style={{ padding: '14px 10px', fontSize: '12px', color: muted, whiteSpace: 'nowrap' }}>{new Date(o.createdAt).toLocaleDateString()}</td>
-                      <td style={{ padding: '14px 10px' }}>
-                        <button
-                          onClick={() => openEdit(o)}
-                          style={{
-                            background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-                            color: '#fff', border: 'none', padding: '6px 14px',
-                            borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
-                          }}
-                        >Update</button>
+                  {filtered.map(c => (
+                    <tr key={c._id}>
+                      <td style={{ fontWeight: 700, color: '#6366f1', whiteSpace: 'nowrap' }}>{c.trackingId}</td>
+                      <td style={{ color: text, whiteSpace: 'nowrap' }}>{c.senderName}</td>
+                      <td style={{ color: text, whiteSpace: 'nowrap' }}>{c.receiverName}</td>
+                      <td style={{ color: muted }}>{c.packageType}</td>
+                      <td style={{ color: muted, maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.pickupAddress}>{c.pickupAddress}</td>
+                      <td style={{ color: muted, maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.deliveryAddress}>{c.deliveryAddress}</td>
+                      <td style={{ color: muted }}>{c.assignedAgent || '—'}</td>
+                      <td>
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                          background: c.paymentStatus === 'Paid' ? (dark ? '#052e16' : '#f0fdf4') : (dark ? '#1c1400' : '#fffbeb'),
+                          color: c.paymentStatus === 'Paid' ? '#16a34a' : '#d97706',
+                        }}>
+                          {c.paymentStatus === 'Paid' ? '✅ Paid' : '💵 COD'}
+                        </span>
+                      </td>
+                      <td><StatusBadge status={c.status} /></td>
+                      <td style={{ color: muted, whiteSpace: 'nowrap' }}>{new Date(c.createdAt).toLocaleDateString()}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={() => { setEditModal(c); setEditForm({ status: c.status, assignedAgent: c.assignedAgent || '' }); }}
+                            className="sc-btn"
+                            style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', padding: '5px 12px', fontSize: 12 }}
+                          >Edit</button>
+                          {c.status === 'Out for Delivery' && !c.otpVerified && (
+                            <button
+                              onClick={() => { setOtpModal(c); setOtpInput(''); }}
+                              className="sc-btn"
+                              style={{ background: 'linear-gradient(135deg,#16a34a,#15803d)', color: '#fff', padding: '5px 12px', fontSize: 12 }}
+                            >🔐 OTP</button>
+                          )}
+                          {c.otpVerified && (
+                            <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, display: 'flex', alignItems: 'center' }}>✅</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -204,55 +225,72 @@ export default function OrdersDashboard() {
         </div>
       </div>
 
-      {/* Status update modal */}
+      {/* Edit modal */}
       {editModal && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-          backdropFilter: 'blur(4px)',
-        }}>
-          <div style={{
-            background: card, borderRadius: '20px', padding: '32px',
-            width: '100%', maxWidth: '420px', border: `1px solid ${border}`,
-            animation: 'fadeUp 0.3s ease',
-          }}>
-            <h3 style={{ fontSize: '20px', fontWeight: '700', color: text, marginBottom: '4px' }}>Update Order Status</h3>
-            <p style={{ color: muted, fontSize: '13px', marginBottom: '8px' }}>{editModal.orderId}</p>
-            <p style={{ color: muted, fontSize: '13px', marginBottom: '24px' }}>
-              Customer: <strong style={{ color: text }}>{editModal.customerName}</strong>
-            </p>
-
-            <label style={{ fontSize: '13px', fontWeight: '600', color: muted, display: 'block', marginBottom: '8px' }}>Status</label>
-            <select
-              value={newStatus}
-              onChange={e => setNewStatus(e.target.value)}
-              style={{
-                width: '100%', padding: '12px', borderRadius: '10px',
-                border: `1px solid ${border}`, background: inputBg, color: text,
-                fontSize: '14px', outline: 'none', marginBottom: '24px',
-              }}
-            >
-              {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={() => setEditModal(null)} style={{
-                flex: 1, padding: '12px', borderRadius: '10px',
-                background: darkMode ? '#334155' : '#f1f5f9',
-                color: text, border: 'none', cursor: 'pointer', fontWeight: '600',
-              }}>Cancel</button>
-              <button onClick={saveStatus} disabled={saving} style={{
-                flex: 1, padding: '12px', borderRadius: '10px',
-                background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-                color: '#fff', border: 'none', cursor: 'pointer', fontWeight: '600',
-                opacity: saving ? 0.7 : 1,
-              }}>{saving ? 'Saving...' : 'Save'}</button>
+        <div className="sc-overlay">
+          <div className="sc-modal">
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: text, marginBottom: 4 }}>Update Order</h3>
+            <p style={{ color: '#6366f1', fontSize: 13, fontWeight: 600, marginBottom: 20 }}>{editModal.trackingId}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: muted, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</label>
+                <select value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })} className="sc-input">
+                  {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: muted, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned Agent</label>
+                <input value={editForm.assignedAgent} onChange={e => setEditForm({ ...editForm, assignedAgent: e.target.value })} placeholder="Agent name" className="sc-input" />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+              <button onClick={() => setEditModal(null)} className="sc-btn"
+                style={{ flex: 1, background: dark ? '#334155' : '#f1f5f9', color: text, border: `1px solid ${border}` }}>
+                Cancel
+              </button>
+              <button onClick={saveEdit} disabled={saving} className="sc-btn"
+                style={{ flex: 1, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', opacity: saving ? 0.7 : 1 }}>
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      <style>{`@keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }`}</style>
-    </div>
+      {/* OTP modal */}
+      {otpModal && (
+        <div className="sc-overlay">
+          <div className="sc-modal" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 44, marginBottom: 12 }}>🔐</div>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: text, marginBottom: 6 }}>Verify Delivery OTP</h3>
+            <p style={{ color: '#6366f1', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{otpModal.trackingId}</p>
+            <p style={{ color: muted, fontSize: 13, marginBottom: 16 }}>
+              Receiver: <strong style={{ color: text }}>{otpModal.receiverName}</strong>
+            </p>
+            <div style={{ background: dark ? '#0f172a' : '#f8fafc', border: `1px solid ${border}`, borderRadius: 10, padding: '10px 14px', marginBottom: 18, textAlign: 'left' }}>
+              <p style={{ fontSize: 12, color: muted, lineHeight: 1.6 }}>
+                Ask the customer for their OTP and enter it below. The order will be marked <strong style={{ color: '#16a34a' }}>Delivered</strong>.
+              </p>
+            </div>
+            <input
+              value={otpInput} onChange={e => setOtpInput(e.target.value)}
+              placeholder="Enter OTP" maxLength={8}
+              className="sc-input"
+              style={{ fontSize: 22, textAlign: 'center', letterSpacing: 8, marginBottom: 20 }}
+            />
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button onClick={() => { setOtpModal(null); setOtpInput(''); }} className="sc-btn"
+                style={{ flex: 1, background: dark ? '#334155' : '#f1f5f9', color: text, border: `1px solid ${border}` }}>
+                Cancel
+              </button>
+              <button onClick={verifyOtp} disabled={verifying} className="sc-btn"
+                style={{ flex: 1, background: 'linear-gradient(135deg,#16a34a,#15803d)', color: '#fff', opacity: verifying ? 0.7 : 1 }}>
+                {verifying ? 'Verifying...' : '✅ Confirm Delivery'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

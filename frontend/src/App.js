@@ -1,6 +1,6 @@
 import { Toaster } from 'react-hot-toast';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import Navbar from './components/Navbar';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import Sidebar from './components/Sidebar';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AdminDashboard from './pages/AdminDashboard';
 import BookCourier from './pages/BookCourier';
@@ -25,39 +25,65 @@ const HomeRedirect = () => {
   return user.role === 'admin' ? <Navigate to="/admin" replace /> : <Navigate to="/dashboard" replace />;
 };
 
-function AppRoutes() {
-  return (
-    <BrowserRouter>
-      <Navbar />
+const AUTH_PATHS = ['/login', '/register'];
+
+function AppShell() {
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  const isAuthPage = AUTH_PATHS.includes(pathname);
+
+  // Auth pages: no sidebar
+  if (isAuthPage || !user) {
+    return (
       <Routes>
-        <Route path="/" element={<HomeRedirect />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/login"    element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/track" element={<TrackCourier />} />
-        <Route path="/track/:id" element={<TrackCourier />} />
-        <Route path="/dashboard" element={<Guard role="customer"><CustomerDashboard /></Guard>} />
-        <Route path="/book" element={<Guard role="customer"><BookCourier /></Guard>} />
-        <Route path="/my-couriers" element={<Guard role="customer"><MyCouriers /></Guard>} />
-        <Route path="/place-order" element={<Guard role="customer"><PlaceOrder /></Guard>} />
-        <Route path="/admin" element={<Guard role="admin"><AdminDashboard /></Guard>} />
-        <Route path="/admin/orders" element={<Guard role="admin"><OrdersDashboard /></Guard>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*"         element={<Navigate to="/login" replace />} />
       </Routes>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: { borderRadius: '12px', fontFamily: 'Inter, sans-serif', fontSize: '14px', fontWeight: '500' },
-          duration: 3500,
-        }}
-      />
-    </BrowserRouter>
+    );
+  }
+
+  // App pages: sidebar + main content
+  return (
+    <div className="sc-shell">
+      <Sidebar />
+      <div className="sc-main">
+        <Routes>
+          <Route path="/"             element={<HomeRedirect />} />
+          <Route path="/track"        element={<TrackCourier />} />
+          <Route path="/track/:id"    element={<TrackCourier />} />
+          <Route path="/dashboard"    element={<Guard role="customer"><CustomerDashboard /></Guard>} />
+          <Route path="/book"         element={<Guard role="customer"><BookCourier /></Guard>} />
+          <Route path="/my-couriers"  element={<Guard role="customer"><MyCouriers /></Guard>} />
+          <Route path="/place-order"  element={<Guard role="customer"><PlaceOrder /></Guard>} />
+          <Route path="/admin"        element={<Guard role="admin"><AdminDashboard /></Guard>} />
+          <Route path="/admin/orders" element={<Guard role="admin"><OrdersDashboard /></Guard>} />
+          <Route path="*"             element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <BrowserRouter>
+        <AppShell />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              borderRadius: '12px',
+              fontFamily: 'Inter, sans-serif',
+              fontSize: '14px',
+              fontWeight: '500',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            },
+            duration: 3500,
+          }}
+        />
+      </BrowserRouter>
     </AuthProvider>
   );
 }
